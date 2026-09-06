@@ -34,7 +34,7 @@ export default function VerLaudo() {
         ))}
       </div>
 
-      <p className="bg-gray-100 p-3 rounded mb-2 text-sm">{laudo.descricao_laudo}</p>
+      <p className="bg-gray-100 p-3 rounded mb-2 text-sm text-gray-800">{laudo.descricao_laudo}</p>
 
       <label className="block text-sm font-medium mb-1">Valor do serviço (edite se quiser)</label>
       <input

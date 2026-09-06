@@ -39,7 +39,7 @@ export default function Orcamento() {
         ))}
       </div>
 
-      <p className="bg-gray-50 border rounded p-4 mb-4">{laudo.descricao_laudo}</p>
+     <p className="bg-gray-50 border rounded p-4 mb-4 text-gray-800">{laudo.descricao_laudo}</p>
 
       <p className="text-center text-2xl font-bold mb-6">R$ {laudo.valor_servico}</p>
 
