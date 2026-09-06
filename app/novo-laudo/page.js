@@ -2,9 +2,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/lib/protegerPagina'
 
 export default function NovoLaudo() {
   const router = useRouter()
+  const { usuario, oficinaId, carregando } = useAuth()
   const [fotoPlaca, setFotoPlaca] = useState(null)
   const [fotosAvarias, setFotosAvarias] = useState([])
   const [whatsapp, setWhatsapp] = useState('')
@@ -12,7 +14,7 @@ export default function NovoLaudo() {
 
   async function uploadFoto(file, pasta) {
     const nomeArquivo = `${pasta}/${Date.now()}-${file.name}`
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('fotos-laudos')
       .upload(nomeArquivo, file)
 
@@ -31,6 +33,11 @@ export default function NovoLaudo() {
       return
     }
 
+    if (!oficinaId) {
+      alert('Não foi possível identificar sua oficina. Faça login novamente.')
+      return
+    }
+
     setLoading(true)
     try {
       // 1. Upload das fotos
@@ -41,21 +48,22 @@ export default function NovoLaudo() {
         urlsAvarias.push(url)
       }
 
-      // 2. Cria o registro inicial no banco
+      // 2. Cria o registro inicial no banco, já vinculado à oficina
       const { data: laudo, error } = await supabase
         .from('laudos')
         .insert({
           whatsapp_cliente: whatsapp,
           foto_placa_url: urlPlaca,
           fotos_avarias: urlsAvarias,
-          status: 'processando'
+          status: 'processando',
+          oficina_id: oficinaId
         })
         .select()
         .single()
 
       if (error) throw error
 
-      // 3. Chama a rota de IA para processar (Passo 3)
+      // 3. Chama a rota de IA para processar
       const resp = await fetch('/api/processar-laudo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +82,9 @@ export default function NovoLaudo() {
       setLoading(false)
     }
   }
+
+  if (carregando) return <p className="p-6">Carregando...</p>
+  if (!usuario) return null
 
   return (
     <div className="p-6 max-w-md mx-auto">

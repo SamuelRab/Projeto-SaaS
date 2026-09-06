@@ -1,23 +1,28 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/lib/protegerPagina'
 import Link from 'next/link'
 
 export default function Dashboard() {
+  const { usuario, oficinaId, carregando } = useAuth()
   const [laudos, setLaudos] = useState([])
   const laudosRef = useRef([])
   const audioRef = useRef(null)
 
   useEffect(() => {
+    if (!oficinaId) return
+
     // Pede permissão de notificação assim que o funcionário abre o painel
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
 
-    async function carregar() {
+    async function carregarLaudos() {
       const { data } = await supabase
         .from('laudos')
         .select('*')
+        .eq('oficina_id', oficinaId)
         .order('created_at', { ascending: false })
 
       if (data) {
@@ -25,7 +30,7 @@ export default function Dashboard() {
         laudosRef.current = data
       }
     }
-    carregar()
+    carregarLaudos()
 
     // Escuta mudanças em tempo real
     const canal = supabase
@@ -39,12 +44,12 @@ export default function Dashboard() {
           mostrarNotificacao(payload.new)
         }
 
-        carregar()
+        carregarLaudos()
       })
       .subscribe()
 
     return () => supabase.removeChannel(canal)
-  }, [])
+  }, [oficinaId])
 
   function tocarSom() {
     if (!audioRef.current) {
@@ -62,6 +67,14 @@ export default function Dashboard() {
     }
   }
 
+  async function sair() {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
+  if (carregando) return <p className="p-6">Carregando...</p>
+  if (!usuario) return null
+
   return (
     <div className="p-6 max-w-md mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -70,6 +83,10 @@ export default function Dashboard() {
           + Novo Laudo
         </Link>
       </div>
+
+      {laudos.length === 0 && (
+        <p className="text-gray-400 text-center mt-10">Nenhum laudo ainda.</p>
+      )}
 
       {laudos.map((l) => (
         <Link
@@ -83,6 +100,10 @@ export default function Dashboard() {
           <p className="text-sm text-gray-600">{l.status.toUpperCase()}</p>
         </Link>
       ))}
+
+      <button onClick={sair} className="mt-6 text-sm text-gray-400 underline">
+        Sair
+      </button>
     </div>
   )
 }
