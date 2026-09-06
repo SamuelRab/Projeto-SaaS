@@ -54,7 +54,7 @@ Responda SOMENTE em JSON válido, sem markdown, no formato exato:
 `
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,8 +64,14 @@ Responda SOMENTE em JSON válido, sem markdown, no formato exato:
       }
     )
 
-    const dataIA = await resp.json()
-    let textoResposta = dataIA.candidates[0].content.parts[0].text
+   const dataIA = await resp.json()
+
+if (!resp.ok || !dataIA.candidates) {
+  console.error('Erro da API Gemini:', JSON.stringify(dataIA))
+  throw new Error('Gemini API error: ' + JSON.stringify(dataIA.error || dataIA))
+}
+
+let textoResposta = dataIA.candidates[0].content.parts[0].text
 
     // Limpa possíveis blocos de markdown que o modelo às vezes manda
     textoResposta = textoResposta.replace(/```json|```/g, '').trim()
