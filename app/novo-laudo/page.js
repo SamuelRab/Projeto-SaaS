@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/protegerPagina'
 
@@ -14,16 +15,9 @@ export default function NovoLaudo() {
 
   async function uploadFoto(file, pasta) {
     const nomeArquivo = `${pasta}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage
-      .from('fotos-laudos')
-      .upload(nomeArquivo, file)
-
+    const { error } = await supabase.storage.from('fotos-laudos').upload(nomeArquivo, file)
     if (error) throw error
-
-    const { data: urlData } = supabase.storage
-      .from('fotos-laudos')
-      .getPublicUrl(nomeArquivo)
-
+    const { data: urlData } = supabase.storage.from('fotos-laudos').getPublicUrl(nomeArquivo)
     return urlData.publicUrl
   }
 
@@ -32,7 +26,6 @@ export default function NovoLaudo() {
       alert('Preencha a foto da placa, ao menos 1 foto de avaria e o WhatsApp.')
       return
     }
-
     if (!oficinaId) {
       alert('Não foi possível identificar sua oficina. Faça login novamente.')
       return
@@ -40,15 +33,12 @@ export default function NovoLaudo() {
 
     setLoading(true)
     try {
-      // 1. Upload das fotos
       const urlPlaca = await uploadFoto(fotoPlaca, 'placas')
       const urlsAvarias = []
       for (const foto of fotosAvarias) {
-        const url = await uploadFoto(foto, 'avarias')
-        urlsAvarias.push(url)
+        urlsAvarias.push(await uploadFoto(foto, 'avarias'))
       }
 
-      // 2. Cria o registro inicial no banco, já vinculado à oficina
       const { data: laudo, error } = await supabase
         .from('laudos')
         .insert({
@@ -63,7 +53,6 @@ export default function NovoLaudo() {
 
       if (error) throw error
 
-      // 3. Chama a rota de IA para processar
       const resp = await fetch('/api/processar-laudo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,9 +61,7 @@ export default function NovoLaudo() {
 
       if (!resp.ok) throw new Error('Erro ao processar com IA')
 
-      // 4. Redireciona pro laudo pronto (tela de revisão do funcionário)
       router.push(`/laudo/${laudo.id}`)
-
     } catch (err) {
       console.error(err)
       alert('Erro: ' + err.message)
@@ -83,48 +70,69 @@ export default function NovoLaudo() {
     }
   }
 
-  if (carregando) return <p className="p-6">Carregando...</p>
+  if (carregando) {
+    return (
+      <div className="min-h-screen bg-night flex items-center justify-center">
+        <p className="text-muted">Carregando...</p>
+      </div>
+    )
+  }
   if (!usuario) return null
 
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Novo Laudo</h1>
+    <div className="min-h-screen bg-night">
+      <div className="border-b border-line px-6 py-6">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          <Link href="/dashboard" className="text-muted hover:text-white transition-colors">←</Link>
+          <div>
+            <div className="w-6 h-1 bg-accent rounded-full mb-2" />
+            <h1 className="font-display text-3xl text-white leading-none">Novo laudo</h1>
+          </div>
+        </div>
+      </div>
 
-      <label className="block mb-2 font-medium">📸 Foto da placa</label>
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => setFotoPlaca(e.target.files[0])}
-        className="mb-4 block w-full"
-      />
+      <div className="max-w-md mx-auto px-6 py-6 pb-16">
+        <label className="block text-sm text-muted mb-2">Foto da placa</label>
+        <label className="flex items-center justify-between bg-surface border border-line hover:border-accent/50 transition-colors rounded-lg px-4 py-3.5 mb-5 cursor-pointer">
+          <span className="text-white text-sm">{fotoPlaca ? fotoPlaca.name : 'Tirar foto da placa'}</span>
+          <span className="text-accent text-sm">Câmera</span>
+          <input
+            type="file" accept="image/*" capture="environment"
+            onChange={(e) => setFotoPlaca(e.target.files[0])}
+            className="hidden"
+          />
+        </label>
 
-      <label className="block mb-2 font-medium">📸 Fotos das avarias (pode selecionar várias)</label>
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        onChange={(e) => setFotosAvarias(Array.from(e.target.files))}
-        className="mb-4 block w-full"
-      />
+        <label className="block text-sm text-muted mb-2">Fotos das avarias</label>
+        <label className="flex items-center justify-between bg-surface border border-line hover:border-accent/50 transition-colors rounded-lg px-4 py-3.5 mb-5 cursor-pointer">
+          <span className="text-white text-sm">
+            {fotosAvarias.length > 0 ? `${fotosAvarias.length} foto(s) selecionada(s)` : 'Fotografar avarias'}
+          </span>
+          <span className="text-accent text-sm">Câmera</span>
+          <input
+            type="file" accept="image/*" capture="environment" multiple
+            onChange={(e) => setFotosAvarias(Array.from(e.target.files))}
+            className="hidden"
+          />
+        </label>
 
-      <label className="block mb-2 font-medium">📱 WhatsApp do cliente</label>
-      <input
-        type="tel"
-        placeholder="5511999999999"
-        value={whatsapp}
-        onChange={(e) => setWhatsapp(e.target.value)}
-        className="mb-6 block w-full border rounded p-2"
-      />
+        <label className="block text-sm text-muted mb-2">WhatsApp do cliente</label>
+        <input
+          type="tel"
+          placeholder="5511999999999"
+          value={whatsapp}
+          onChange={(e) => setWhatsapp(e.target.value)}
+          className="w-full bg-surface border border-line rounded-lg px-4 py-3.5 mb-8 text-white outline-none focus:border-accent transition-colors"
+        />
 
-      <button
-        onClick={handleSalvar}
-        disabled={loading}
-        className="w-full bg-green-600 text-white font-bold py-3 rounded"
-      >
-        {loading ? 'Processando com IA...' : 'Salvar e Gerar Laudo'}
-      </button>
+        <button
+          onClick={handleSalvar}
+          disabled={loading}
+          className="w-full bg-accent hover:bg-accent-dark disabled:opacity-60 transition-colors text-white font-semibold py-4 rounded-lg"
+        >
+          {loading ? 'Processando o laudo...' : 'Gerar laudo'}
+        </button>
+      </div>
     </div>
   )
 }

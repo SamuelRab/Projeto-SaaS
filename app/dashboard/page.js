@@ -13,7 +13,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (!oficinaId) return
 
-    // Pede permissão de notificação assim que o funcionário abre o painel
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
@@ -32,18 +31,14 @@ export default function Dashboard() {
     }
     carregarLaudos()
 
-    // Escuta mudanças em tempo real
     const canal = supabase
       .channel('laudos-realtime')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'laudos' }, (payload) => {
         const laudoAntigo = laudosRef.current.find(l => l.id === payload.new.id)
-
-        // Só notifica se o status mudou DE algo diferente PARA "aprovado"
         if (laudoAntigo && laudoAntigo.status !== 'aprovado' && payload.new.status === 'aprovado') {
           tocarSom()
           mostrarNotificacao(payload.new)
         }
-
         carregarLaudos()
       })
       .subscribe()
@@ -60,7 +55,7 @@ export default function Dashboard() {
 
   function mostrarNotificacao(laudo) {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('✅ Serviço Aprovado!', {
+      new Notification('Serviço aprovado', {
         body: `Placa ${laudo.placa} — o cliente aprovou o orçamento.`,
         icon: '/favicon.ico'
       })
@@ -72,38 +67,78 @@ export default function Dashboard() {
     window.location.href = '/login'
   }
 
-  if (carregando) return <p className="p-6">Carregando...</p>
+  if (carregando) {
+    return (
+      <div className="min-h-screen bg-night flex items-center justify-center">
+        <p className="text-muted">Carregando...</p>
+      </div>
+    )
+  }
   if (!usuario) return null
 
+  const pendentes = laudos.filter(l => l.status !== 'aprovado').length
+  const aprovados = laudos.filter(l => l.status === 'aprovado').length
+
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Painel</h1>
-        <Link href="/novo-laudo" className="bg-blue-600 text-white px-4 py-2 rounded">
-          + Novo Laudo
-        </Link>
+    <div className="min-h-screen bg-night">
+      <div className="border-b border-line px-6 py-6">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div>
+            <div className="w-6 h-1 bg-accent rounded-full mb-2" />
+            <h1 className="font-display text-3xl text-white leading-none">Painel</h1>
+          </div>
+          <button onClick={sair} className="text-sm text-muted hover:text-white transition-colors">
+            Sair
+          </button>
+        </div>
       </div>
 
-      {laudos.length === 0 && (
-        <p className="text-gray-400 text-center mt-10">Nenhum laudo ainda.</p>
-      )}
+      <div className="max-w-md mx-auto px-6 pt-6">
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-surface border border-line rounded-lg p-4">
+            <p className="text-2xl font-display text-warn">{pendentes}</p>
+            <p className="text-xs text-muted mt-0.5">Aguardando</p>
+          </div>
+          <div className="bg-surface border border-line rounded-lg p-4">
+            <p className="text-2xl font-display text-ok">{aprovados}</p>
+            <p className="text-xs text-muted mt-0.5">Aprovados</p>
+          </div>
+        </div>
 
-      {laudos.map((l) => (
         <Link
-          key={l.id}
-          href={`/laudo/${l.id}`}
-          className={`block p-4 mb-3 rounded border-l-4 ${
-            l.status === 'aprovado' ? 'border-green-600 bg-green-50' : 'border-yellow-500 bg-yellow-50'
-          }`}
+          href="/novo-laudo"
+          className="block text-center bg-accent hover:bg-accent-dark transition-colors text-white font-semibold py-3.5 rounded-lg mb-6"
         >
-          <p className="font-bold text-gray-900">{l.placa || 'Placa pendente'}</p>
-          <p className="text-sm text-gray-600">{l.status.toUpperCase()}</p>
+          + Novo laudo
         </Link>
-      ))}
 
-      <button onClick={sair} className="mt-6 text-sm text-gray-400 underline">
-        Sair
-      </button>
+        {laudos.length === 0 && (
+          <p className="text-muted text-center text-sm mt-10">
+            Nenhum laudo criado ainda. Comece pelo botão acima.
+          </p>
+        )}
+
+        <div className="space-y-2 pb-10">
+          {laudos.map((l) => {
+            const aprovado = l.status === 'aprovado'
+            return (
+              <Link
+                key={l.id}
+                href={`/laudo/${l.id}`}
+                className="flex items-center justify-between bg-surface border border-line hover:border-accent/50 transition-colors rounded-lg px-4 py-3.5"
+              >
+                <div>
+                  <p className="font-mono text-white tracking-wide">{l.placa || 'Placa pendente'}</p>
+                  <p className={`text-xs mt-0.5 ${aprovado ? 'text-ok' : 'text-warn'}`}>
+                    {aprovado ? 'Aprovado' : l.status === 'processando' ? 'Processando' : 'Aguardando cliente'}
+                  </p>
+                </div>
+                <div className={`w-2 h-2 rounded-full ${aprovado ? 'bg-ok' : 'bg-warn'}`} />
+              </Link>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
